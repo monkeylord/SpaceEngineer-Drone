@@ -1,4 +1,6 @@
 //武器控制
+//其中弹道计算部分来自MEA群主的算法
+
 private bool ManualShot()
 {
 	GridTerminalSystem.GetBlocksOfType<IMyUserControllableGun>(list);   

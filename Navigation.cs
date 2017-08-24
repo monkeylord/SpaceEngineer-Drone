@@ -1,4 +1,5 @@
 //计时器频率控制
+//其中陀螺仪手动控制，来自于MEA群主的算法
 private void nextTick()
 {
 	timer.GetActionWithName("TriggerNow").Apply(timer);
