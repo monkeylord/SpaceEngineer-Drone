@@ -1,78 +1,20 @@
-//计时器频率控制
-//其中陀螺仪手动控制，来自于MEA群主的算法
-private void nextTick()
-{
-	timer.GetActionWithName("TriggerNow").Apply(timer);
-	Ticking=true;
-}
-private void Stasis(bool status)
-{
-	if(status)
-	{
-		//进入休眠频率
-		if(timer != null)timer.SetValue("TriggerDelay",SleepFrq);
-		//越级控制结束
-		GridTerminalSystem.GetBlocksOfType<IMyGravityGenerator>(listT);
-		for(int i=0;i<listT.Count;i++)
-		{
-			((IMyGravityGenerator)listT[i]).GetActionWithName("OnOff_Off").Apply(listT[i]);
-		}
-		GridTerminalSystem.GetBlocksOfType<IMyVirtualMass>(listT);
-		for(int i=0;i<listT.Count;i++)
-		{
-			((IMyVirtualMass)listT[i]).GetActionWithName("OnOff_Off").Apply(listT[i]);
-		}		
-		Gear(0.0f);
+class Navi{
+	public Navi(IMyTerminalBlock baseblock){
 		
 	}
-	else
-	{
-		//进入战斗频率
-		if(timer != null)timer.SetValue("TriggerDelay",WarFrq);
-		GridTerminalSystem.GetBlocksOfType<IMyGravityGenerator>(listT);
-		for(int i=0;i<listT.Count;i++)
-		{
-			((IMyGravityGenerator)listT[i]).GetActionWithName("OnOff_On").Apply(listT[i]);
-		}
-		GridTerminalSystem.GetBlocksOfType<IMyVirtualMass>(listT);
-		for(int i=0;i<listT.Count;i++)
-		{
-			((IMyVirtualMass)listT[i]).GetActionWithName("OnOff_On").Apply(listT[i]);
-		}
-	}
-	
-	
-}
-void GStasis(bool status){
-	if(status)
-	{
-		GridTerminalSystem.GetBlocksOfType<IMyGravityGenerator>(listT);
-		for(int i=0;i<listT.Count;i++)
-		{
-			((IMyGravityGenerator)listT[i]).GetActionWithName("OnOff_Off").Apply(listT[i]);
-		}
-		GridTerminalSystem.GetBlocksOfType<IMyVirtualMass>(listT);
-		for(int i=0;i<listT.Count;i++)
-		{
-			((IMyVirtualMass)listT[i]).GetActionWithName("OnOff_Off").Apply(listT[i]);
-		}		
-		Gear(0.0f);
+	public bool FaceTo(Vector3D direction){
 		
 	}
-	else
-	{
-		GridTerminalSystem.GetBlocksOfType<IMyGravityGenerator>(listT);
-		for(int i=0;i<listT.Count;i++)
-		{
-			((IMyGravityGenerator)listT[i]).GetActionWithName("OnOff_On").Apply(listT[i]);
-		}
-		GridTerminalSystem.GetBlocksOfType<IMyVirtualMass>(listT);
-		for(int i=0;i<listT.Count;i++)
-		{
-			((IMyVirtualMass)listT[i]).GetActionWithName("OnOff_On").Apply(listT[i]);
-		}
+	public bool Engine(float speed){
+		
 	}
-}
+	public bool Engine(Vector3D speedVec){
+		
+	}
+	public bool Stasis(bool onoff){
+		
+	}
+	
 
 //瞄准方向控制
 enum FaceModes {Remote,Gyro};
@@ -109,59 +51,7 @@ void FaceTo(Vector3D pos,string description)
 	TimePast++;
 	GridTerminalSystem.GetBlocksOfType<IMyRadioAntenna>(list);
 	if(list.Count>0)list[0].SetCustomName(sb);
-}
-
-
-//以下为动力控制
-
-bool GReversed=false;
-private void ReverseG(bool Reverse)
-{
-	GStasis(false);
-	if(Reverse^GReversed){
-		GridTerminalSystem.GetBlocksOfType<IMyGravityGenerator>(list);   
-		for(int i=0;i<list.Count;i++)   
-		{ 
-			IMyGravityGenerator GG = list[i] as IMyGravityGenerator; 
-			GG.SetValue("Gravity", -1*GG.GetValueFloat("Gravity"));   
-		}
-		GReversed=!GReversed;
-	}
-}
-
-float GearLevel=0;
-float Gear(float level){
-		if(!GearInited)GearInit(remote);
-		for(int i=0;i<ForwardT.Count;i++)   
-		{ 
-			IMyThrust Thrust = ForwardT[i] as IMyThrust; 
-			if(level>0)Thrust.SetValue("Override",level);
-			else Thrust.SetValue("Override",1.0f);
-		}
-
-		for(int i=0;i<BackwardT.Count;i++)   
-		{ 
-			IMyThrust Thrust = BackwardT[i] as IMyThrust; 
-			if(level>0)Thrust.SetValue("Override",1.0f);
-			else Thrust.SetValue("Override",-level);
-		}
-		if(Math.Abs(level)>100.0f)ReverseG((level<0)?true:false);
-		else GStasis(true);
-		GearLevel=level;
-		return GearLevel;
-
-}
-
-List<IMyTerminalBlock> BackwardT=new List<IMyTerminalBlock>();
-List<IMyTerminalBlock> ForwardT=new List<IMyTerminalBlock>();
-bool GearInited=false;
-void GearInit(IMyRemoteControl MyRemote){
-	GridTerminalSystem.SearchBlocksOfName("FrontThrust",BackwardT);
-	GridTerminalSystem.SearchBlocksOfName("BackThrust",ForwardT);
-	GearInited=true;
-}
-
-
+}	
 //以下是陀螺仪控制
 void SetGyroOverride(bool bOverride)
 {
@@ -218,10 +108,10 @@ Vector3D Z_VECTOR = new Vector3D(0, 0, -1);
 Vector3D POINT_ZERO = new Vector3D(0, 0, 0);
 
 bool GyroInited = false;
-void GyroInit(IMyRemoteControl MyRemote)
+void GyroInit(IMyTerminalBlock baseblock)
 {
 	//处理陀螺仪
-	refWorldMatrix=MyRemote.WorldMatrix;
+	refWorldMatrix=baseblock.WorldMatrix;
 	Gyroscopes = new List<IMyTerminalBlock>();
 	GridTerminalSystem.GetBlocksOfType<IMyGyro> (Gyroscopes);
 	if(Gyroscopes.Count > 0)
@@ -328,3 +218,134 @@ void GyroInit(IMyRemoteControl MyRemote)
 	
 	GyroInited = true;
 }
+}
+
+
+//计时器频率控制
+//其中陀螺仪手动控制，来自于MEA群主的算法
+private void nextTick()
+{
+	timer.GetActionWithName("TriggerNow").Apply(timer);
+	Ticking=true;
+}
+private void Stasis(bool status)
+{
+	if(status)
+	{
+		//进入休眠频率
+		if(timer != null)timer.SetValue("TriggerDelay",SleepFrq);
+		//越级控制结束
+		GridTerminalSystem.GetBlocksOfType<IMyGravityGenerator>(listT);
+		for(int i=0;i<listT.Count;i++)
+		{
+			((IMyGravityGenerator)listT[i]).GetActionWithName("OnOff_Off").Apply(listT[i]);
+		}
+		GridTerminalSystem.GetBlocksOfType<IMyVirtualMass>(listT);
+		for(int i=0;i<listT.Count;i++)
+		{
+			((IMyVirtualMass)listT[i]).GetActionWithName("OnOff_Off").Apply(listT[i]);
+		}		
+		Gear(0.0f);
+		
+	}
+	else
+	{
+		//进入战斗频率
+		if(timer != null)timer.SetValue("TriggerDelay",WarFrq);
+		GridTerminalSystem.GetBlocksOfType<IMyGravityGenerator>(listT);
+		for(int i=0;i<listT.Count;i++)
+		{
+			((IMyGravityGenerator)listT[i]).GetActionWithName("OnOff_On").Apply(listT[i]);
+		}
+		GridTerminalSystem.GetBlocksOfType<IMyVirtualMass>(listT);
+		for(int i=0;i<listT.Count;i++)
+		{
+			((IMyVirtualMass)listT[i]).GetActionWithName("OnOff_On").Apply(listT[i]);
+		}
+	}
+	
+	
+}
+void GStasis(bool status){
+	if(status)
+	{
+		GridTerminalSystem.GetBlocksOfType<IMyGravityGenerator>(listT);
+		for(int i=0;i<listT.Count;i++)
+		{
+			((IMyGravityGenerator)listT[i]).GetActionWithName("OnOff_Off").Apply(listT[i]);
+		}
+		GridTerminalSystem.GetBlocksOfType<IMyVirtualMass>(listT);
+		for(int i=0;i<listT.Count;i++)
+		{
+			((IMyVirtualMass)listT[i]).GetActionWithName("OnOff_Off").Apply(listT[i]);
+		}		
+		Gear(0.0f);
+		
+	}
+	else
+	{
+		GridTerminalSystem.GetBlocksOfType<IMyGravityGenerator>(listT);
+		for(int i=0;i<listT.Count;i++)
+		{
+			((IMyGravityGenerator)listT[i]).GetActionWithName("OnOff_On").Apply(listT[i]);
+		}
+		GridTerminalSystem.GetBlocksOfType<IMyVirtualMass>(listT);
+		for(int i=0;i<listT.Count;i++)
+		{
+			((IMyVirtualMass)listT[i]).GetActionWithName("OnOff_On").Apply(listT[i]);
+		}
+	}
+}
+
+
+
+
+//以下为动力控制
+
+bool GReversed=false;
+private void ReverseG(bool Reverse)
+{
+	GStasis(false);
+	if(Reverse^GReversed){
+		GridTerminalSystem.GetBlocksOfType<IMyGravityGenerator>(list);   
+		for(int i=0;i<list.Count;i++)   
+		{ 
+			IMyGravityGenerator GG = list[i] as IMyGravityGenerator; 
+			GG.SetValue("Gravity", -1*GG.GetValueFloat("Gravity"));   
+		}
+		GReversed=!GReversed;
+	}
+}
+
+float GearLevel=0;
+float Gear(float level){
+		if(!GearInited)GearInit(remote);
+		for(int i=0;i<ForwardT.Count;i++)   
+		{ 
+			IMyThrust Thrust = ForwardT[i] as IMyThrust; 
+			if(level>0)Thrust.SetValue("Override",level);
+			else Thrust.SetValue("Override",1.0f);
+		}
+
+		for(int i=0;i<BackwardT.Count;i++)   
+		{ 
+			IMyThrust Thrust = BackwardT[i] as IMyThrust; 
+			if(level>0)Thrust.SetValue("Override",1.0f);
+			else Thrust.SetValue("Override",-level);
+		}
+		if(Math.Abs(level)>100.0f)ReverseG((level<0)?true:false);
+		else GStasis(true);
+		GearLevel=level;
+		return GearLevel;
+
+}
+
+List<IMyTerminalBlock> BackwardT=new List<IMyTerminalBlock>();
+List<IMyTerminalBlock> ForwardT=new List<IMyTerminalBlock>();
+bool GearInited=false;
+void GearInit(IMyRemoteControl MyRemote){
+	GridTerminalSystem.SearchBlocksOfName("FrontThrust",BackwardT);
+	GridTerminalSystem.SearchBlocksOfName("BackThrust",ForwardT);
+	GearInited=true;
+}
+

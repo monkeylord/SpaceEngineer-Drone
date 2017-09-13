@@ -1,3 +1,14 @@
+UnionControl uc=null;
+public void Main(string argument) {
+
+    // The main entry point of the script, invoked every time
+    // one of the programmable block's Run actions are invoked.
+    // 
+    // The method itself is required, but the argument above
+    // can be removed if not needed.
+	if(uc==null)uc=new UnionControl(this);
+	uc.Update();
+}
 public class UnionControl{
 	
 	MyGridProgram MGP;
@@ -31,8 +42,7 @@ public class UnionControl{
 	//public bool Manual(bool OnOff);
 	//public void Heading(Vector3D headingTo);
 	//public void VectorMove(Vector3D Power,Vector3D headingTo);
-	//public void Output(Vector3D outputVector);
-	//public void Output(float output);	
+	//public void Output(Vector3D OutputVector);
 	public UnionControl(MyGridProgram mgp,IMyShipController SC=null){
 		MGP=mgp;
 		SettedMain=SC;
@@ -99,9 +109,6 @@ public class UnionControl{
 	}
 	public void Output(Vector3D outputVector){
 		OutputVector=outputVector;
-	}
-	public void Output(float output){
-		OutputVector=new Vector3D(0,0,output);
 	}
 	public void VectorMove(Vector3D Power,Vector3D headingTo){
 		//TODO	根据推进器最大出力，将方向矢量转换为出力矢量。
