@@ -8,8 +8,8 @@ public class UnionControl{
 	Vector3D CruiseVelocity=new Vector3D(0);
 	Vector3D CruiseDirection=new Vector3D(0);
 	Vector3D faceToDir=new Vector3D(0);
-	bool IsCruising;
-	bool InertiaDump;
+	bool IsCruising=false;
+	bool InertiaDump=true;
 	String LastMsg;
 	List<IMyGyro> Gyroscopes = new List<IMyGyro>();
 	List<IMyGravityGenerator> GGs =  new List<IMyGravityGenerator>();
@@ -36,6 +36,8 @@ public class UnionControl{
 	public UnionControl(MyGridProgram mgp,IMyShipController SC=null){
 		MGP=mgp;
 		SettedMain=SC;
+		if(SettedMain!=null)Main=SC;
+		Init();
 		Update();
 	}
 	public void Update(){
@@ -47,32 +49,39 @@ public class UnionControl{
 			foreach(IMyShipController sc in list)if(sc.IsUnderControl)MainFound=sc;
 			if(Main!=MainFound && MainFound!=null){Main=MainFound;Init();}
 			else if(Main==null)return;
-		}
+		}else Main=SettedMain;
 		//TODO	更新当前速度、加速度、旋转状态，更新当前操作状态
 		MyPos=Main.GetPosition();
 		MyVelocity=Main.GetShipVelocities().LinearVelocity;
-		InertiaDump=Main.DampenersOverride;
+		InertiaDump=(ManualControl)?InertiaDump:Main.DampenersOverride;
 		Vector3 MoveIndicator=Main.MoveIndicator;
-		
-		Vector3D rotation=(ManualControl)?new Vector3D(0):new Vector3D(Main.RotationIndicator.Y,-Main.RotationIndicator.X,-Main.RollIndicator*100);		//陀螺仪方向
-		//将飞船速度转换坐标系为相对速度
 		MatrixD refLookAtMatrix = MatrixD.CreateLookAt(new Vector3D(0,0,0), Main.WorldMatrix.Forward, Main.WorldMatrix.Up);
+		Vector3D rotation = (ManualControl)?Gyro(faceToDir):new Vector3D(Main.RotationIndicator.Y,-Main.RotationIndicator.X,-Main.RollIndicator*100);		//陀螺仪方向
+		//控制陀螺仪惯性
+		Vector3D AngularVectorToMe = Vector3D.TransformNormal(Main.GetShipVelocities().AngularVelocity, refLookAtMatrix); 
+		rotation = rotation - new Vector3D(AngularVectorToMe.Y,-AngularVectorToMe.X,-AngularVectorToMe.Z);
+		SetGyroYPR(rotation);
+		//将飞船速度转换坐标系为相对速度
+
 		Vector3D relativeVelocity = new Vector3D(0);
 		if(MyVelocity.Length()>0)relativeVelocity = Vector3D.TransformNormal(MyVelocity, refLookAtMatrix);	//坐标系转换后的相对速度
 		Vector3D relativeCruiseVelocity = new Vector3D(0);
 		if(CruiseVelocity.Length()>0)relativeCruiseVelocity = Vector3D.TransformNormal(CruiseVelocity, refLookAtMatrix);
 		//判断惯性控制输出
 		Vector3D output=(ManualControl)?OutputVector:new Vector3D(MoveIndicator.X*-100f,MoveIndicator.Y*-100f,MoveIndicator.Z*-100f);// 从控制到出力转换
+		Vector3D expectVelocity=(output.Length()>0)?Vector3D.Normalize(output)*-100:Vector3D.Zero;
 		if(InertiaDump){
-			if(output.X==0)output.X=CalcInertiaDump(relativeVelocity.X-relativeCruiseVelocity.X);
-			if(output.Y==0)output.Y=CalcInertiaDump(relativeVelocity.Y-relativeCruiseVelocity.Y);
-			if(output.Z==0)output.Z=CalcInertiaDump(relativeVelocity.Z-relativeCruiseVelocity.Z);
+			output.X=CalcInertiaDump(relativeVelocity.X-expectVelocity.X);
+			output.Y=CalcInertiaDump(relativeVelocity.Y-expectVelocity.Y);
+			output.Z=CalcInertiaDump(relativeVelocity.Z-expectVelocity.Z);
+			//output=(output.Length()>0)?Vector3D.Normalize(output)*100:Vector3D.Zero;
+		}else{
+			output=-expectVelocity;
 		}
+		MGP.Echo(output.ToString());
 		GEngine(output);
 		TEngine(output);
 		SEngine(output);
-		if(rotation.Length()==0&&faceToDir.Length()>0)Gyro(faceToDir);
-		else {SetGyroYPR(rotation);faceToDir=(ManualControl)?faceToDir:Main.WorldMatrix.Forward;};
 	}
 	
 	public bool Cruise(bool Cruise){
@@ -98,6 +107,10 @@ public class UnionControl{
 		faceToDir=headingTo;
 	}
 	public void Output(Vector3D outputVector){
+		MatrixD refLookAtMatrix = MatrixD.CreateLookAt(new Vector3D(0,0,0), Main.WorldMatrix.Forward, Main.WorldMatrix.Up);
+		OutputVector=Vector3D.Normalize(Vector3D.TransformNormal(outputVector, refLookAtMatrix))*outputVector.Length();
+	}
+	public void OutputRelative(Vector3D outputVector){
 		OutputVector=outputVector;
 	}
 	public void Output(float output){
@@ -136,21 +149,27 @@ public class UnionControl{
 		foreach(IMyThrust Thrust in Thrusts){
 			switch(Directions[Thrust]){
 				case Base6Directions.Direction.Forward:
+					Thrust.ApplyAction((output.Z>0)?"OnOff_On":"OnOff_Off");
 					Thrust.SetValue("Override",Convert.ToSingle((output.Z>0)?output.Z:0f));
 				break;
 				case Base6Directions.Direction.Backward:
+					Thrust.ApplyAction((output.Z<0)?"OnOff_On":"OnOff_Off");
 					Thrust.SetValue("Override",Convert.ToSingle((output.Z<0)?-output.Z:0f));
 				break;
 				case Base6Directions.Direction.Left:
+					Thrust.ApplyAction((output.X>0)?"OnOff_On":"OnOff_Off");
 					Thrust.SetValue("Override",Convert.ToSingle((output.X>0)?output.X:0f));
 				break;
 				case Base6Directions.Direction.Right:
+					Thrust.ApplyAction((output.X<0)?"OnOff_On":"OnOff_Off");
 					Thrust.SetValue("Override",Convert.ToSingle((output.X<0)?-output.X:0f));
 				break;
 				case Base6Directions.Direction.Down:
+					Thrust.ApplyAction((output.Y>0)?"OnOff_On":"OnOff_Off");
 					Thrust.SetValue("Override",Convert.ToSingle((output.Y>0)?output.Y:0f));
 				break;
 				case Base6Directions.Direction.Up:
+					Thrust.ApplyAction((output.Y<0)?"OnOff_On":"OnOff_Off");
 					Thrust.SetValue("Override",Convert.ToSingle((output.Y<0)?-output.Y:0f));
 				break;
 			}
@@ -159,13 +178,12 @@ public class UnionControl{
 	private void SEngine(Vector3D output){
 		//TODO	非常规推力
 	}
-	Vector3D Keep=new Vector3D(0);
-	private void Gyro(Vector3D faceToDir){
+	private Vector3D Gyro(Vector3D faceToDir){
 		//TODO	航向保持
 		MatrixD refLookAtMatrix = MatrixD.CreateLookAt(new Vector3D(0,0,0), Main.WorldMatrix.Forward, Main.WorldMatrix.Up);
-		Vector3D indicator=Vector3D.Normalize(Vector3D.TransformNormal(faceToDir, refLookAtMatrix))*40;
+		Vector3D indicator=Vector3D.Normalize(Vector3D.TransformNormal(faceToDir-Main.GetPosition(), refLookAtMatrix))*40;
 		indicator.Z=0f;
-		SetGyroYPR(indicator);
+		return indicator;
 	}
 	private void Init(){
 		//六向陀螺仪统计
@@ -192,10 +210,10 @@ public class UnionControl{
 
 	}
 	private float CalcInertiaDump(double Speed){
-		if(Speed>1)return 100f;
-		else if(Speed<-1)return -100f;
+		if(Speed>0.1)return 100f;
+		else if(Speed<-0.1)return -100f;
 		else if(Math.Abs(Speed)<0.001)return 0f;
-		else return (float)(Speed*Speed*Speed)*100;
+		else return (float)Speed*60;
 	}
 	
 	private void SetGyroYPR(Vector3D Rate)
@@ -310,7 +328,7 @@ public class UnionControl{
 					break;
 				}
 				Gyroscopes[i].ApplyAction("OnOff_On");
-				Gyroscopes[i].ApplyAction("Override");
+				if(!Gyroscopes[i].GyroOverride)Gyroscopes[i].ApplyAction("Override");
 			}
 		}
 	}
